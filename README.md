@@ -92,14 +92,25 @@ SLACK_CHANNEL_ID=your_slack_channel_id
 crontab -e
 
 # 以下の行を追加（パスは実際の環境に合わせて変更してください）
-* * * * * cd /path/to/notion_notice && /path/to/notion_notice/venv/bin/python /path/to/notion_notice/notion.py >> /path/to/notion_notice/cron.log 2>&1
+* * * * * cd /path/to/notion_notice && /path/to/notion_notice/venv/bin/python3 /path/to/notion_notice/notion.py >> /path/to/notion_notice/cron.log 2>&1
 ```
 
 注意点：
 - パスは必ず絶対パスで指定してください
 - `/path/to/notion_notice`は実際のプロジェクトディレクトリのパスに置き換えてください
+- Ubuntu 24.04以降では、必ず`python3`を使用してください（`python`ではなく）
+- 仮想環境のPythonは`venv/bin/python3`にあります
 - ログファイル（cron.log）は自動的に作成されます
 - cronの書式は「分 時 日 月 曜日」の順です（* * * * *は毎分実行を意味します）
+
+パスの確認方法：
+```bash
+# プロジェクトディレクトリの絶対パスを確認
+pwd
+
+# 仮想環境のPythonインタプリタの場所を確認
+ls -l venv/bin/python*
+```
 
 ## Notionデータベースの設定
 
