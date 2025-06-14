@@ -143,11 +143,28 @@ def update_notification_status(page_id):
 
 def send_daily_schedule():
     """1日の予定をまとめて通知する"""
-    tomorrow = datetime.datetime.now(JST) + timedelta(days=1)
+    now = datetime.datetime.now(JST)
+    tomorrow = now + timedelta(days=1)
     tomorrow_start = tomorrow.replace(hour=0, minute=0, second=0, microsecond=0)
     tomorrow_end = tomorrow.replace(hour=23, minute=59, second=59, microsecond=999999)
 
     try:
+        print("\n=== 日次予定の取得 ===")
+        print(f"取得期間: {tomorrow_start.strftime('%Y-%m-%d %H:%M:%S')} から {tomorrow_end.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # デバッグ用：データベースの全予定を取得
+        debug_response = notion.databases.query(
+            database_id=NOTION_DATABASE_ID,
+            sorts=[
+                {
+                    "property": "予定の日時",
+                    "direction": "ascending"
+                }
+            ]
+        )
+        print(f"\nデータベース内の全予定数: {len(debug_response['results'])}件")
+        
+        # 明日の予定を取得（通知済みでない予定のみ）
         response = notion.databases.query(
             database_id=NOTION_DATABASE_ID,
             filter={
@@ -157,6 +174,12 @@ def send_daily_schedule():
                         "date": {
                             "on_or_after": tomorrow_start.isoformat(),
                             "before": tomorrow_end.isoformat()
+                        }
+                    },
+                    {
+                        "property": "通知済み",
+                        "checkbox": {
+                            "equals": False
                         }
                     }
                 ]
@@ -170,25 +193,67 @@ def send_daily_schedule():
         )
 
         if not response["results"]:
+            print("予定が見つかりませんでした")
             # 予定がない場合もその旨を通知
             send_notification(f"{tomorrow.strftime('%Y年%m月%d日')}の予定はありません", "", True)
             return
 
+        print(f"\n取得した予定: {len(response['results'])}件")
+        
         # ヘッダーメッセージを送信
         send_notification(f"=== {tomorrow.strftime('%Y年%m月%d日')}の予定 ===", "", True)
 
         # 各予定を通知
         for page in response["results"]:
             properties = page["properties"]
+            
+            # デバッグ情報：ページの全プロパティを表示
+            print("\n=== ページのプロパティ ===")
+            for prop_name, prop_value in properties.items():
+                print(f"{prop_name}: {prop_value}")
+            
+            # 予定名を取得（「名前」プロパティから）
+            title_property = properties.get("名前")
+            if not title_property or not isinstance(title_property, dict):
+                print(f"Warning: 名前プロパティが無効です")
+                continue  # 無効な予定はスキップ
+            
+            title_array = title_property.get("title", [])
+            if not title_array:
+                print(f"Warning: タイトルが空です")
+                continue  # 空のタイトルはスキップ
+            
+            first_title = title_array[0]
+            if not isinstance(first_title, dict):
+                print(f"Warning: タイトル要素が無効です")
+                continue  # 無効なタイトル要素はスキップ
+            
+            title = first_title.get("plain_text", "")
+            if not title:  # 空文字列の場合はスキップ
+                print(f"Warning: タイトルが空文字列です")
+                continue
+            
+            # 予定の日時を取得
             schedule_date = properties.get("予定の日時", {}).get("date", {}).get("start")
-            if schedule_date:
-                title = properties.get("予定名", {}).get("title", [{}])[0].get("plain_text", "無題")
+            if not schedule_date:
+                print(f"Warning: 予定の日時が設定されていません: {title}")
+                continue
+            
+            try:
                 schedule_datetime = datetime.datetime.fromisoformat(schedule_date).replace(tzinfo=pytz.UTC)
                 schedule_datetime = schedule_datetime.astimezone(JST)
+                print(f"予定: {title} - {schedule_datetime.strftime('%H:%M')}")
                 send_notification(title, schedule_datetime.strftime("%H:%M"), True)
+                # 通知済みフラグを更新
+                update_notification_status(page["id"])
+            except Exception as e:
+                print(f"Warning: 日時の変換エラー: {e}")
+                continue
 
     except Exception as e:
         print(f"日次予定の取得エラー: {e}")
+        import traceback
+        print(traceback.format_exc())
 
 def mark_past_events_as_notified():
     """過去の予定を通知済みにマークする"""
@@ -279,7 +344,7 @@ def main():
     mark_past_events_as_notified()
     
     # 日付が変わった直後（00:00）かどうかをチェック
-    if now.hour == 0 and now.minute == 0:
+    if  now.hour == 0 and now.minute == 0:
         print("日次スケジュールの通知を実行します")
         send_daily_schedule()
     
