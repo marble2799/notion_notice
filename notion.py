@@ -144,7 +144,7 @@ def update_notification_status(page_id):
 def send_daily_schedule():
     """1日の予定をまとめて通知する"""
     now = datetime.datetime.now(JST)
-    tomorrow = now + timedelta(days=1)
+    tomorrow = now
     tomorrow_start = tomorrow.replace(hour=0, minute=0, second=0, microsecond=0)
     tomorrow_end = tomorrow.replace(hour=23, minute=59, second=59, microsecond=999999)
 
@@ -195,13 +195,13 @@ def send_daily_schedule():
         if not response["results"]:
             print("予定が見つかりませんでした")
             # 予定がない場合もその旨を通知
-            send_notification(f"{tomorrow.strftime('%Y年%m月%d日')}の予定はありません", "", True)
+            send_line_notification(f"{tomorrow.strftime('%Y年%m月%d日')}の予定はありません")
             return
 
         print(f"\n取得した予定: {len(response['results'])}件")
         
         # ヘッダーメッセージを送信
-        send_notification(f"=== {tomorrow.strftime('%Y年%m月%d日')}の予定 ===", "", True)
+        send_line_notification(f"=== {tomorrow.strftime('%Y年%m月%d日')}の予定 ===")
 
         # 各予定を通知
         for page in response["results"]:
@@ -245,7 +245,7 @@ def send_daily_schedule():
                 print(f"予定: {title} - {schedule_datetime.strftime('%H:%M')}")
                 send_notification(title, schedule_datetime.strftime("%H:%M"), True)
                 # 通知済みフラグを更新
-                update_notification_status(page["id"])
+                # update_notification_status(page["id"])
             except Exception as e:
                 print(f"Warning: 日時の変換エラー: {e}")
                 continue
