@@ -240,7 +240,8 @@ def send_daily_schedule():
                 continue
             
             try:
-                schedule_datetime = datetime.datetime.fromisoformat(schedule_date).replace(tzinfo=pytz.UTC)
+                # UTCの日時を取得し、JSTに変換
+                schedule_datetime = datetime.datetime.fromisoformat(schedule_date.replace('Z', '+00:00'))
                 schedule_datetime = schedule_datetime.astimezone(JST)
                 print(f"予定: {title} - {schedule_datetime.strftime('%H:%M')}")
                 send_notification(title, schedule_datetime.strftime("%H:%M"), True)
